@@ -433,8 +433,20 @@ function calcMargin(o,wh,mode,sharedStops){
 }
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
-const map=L.map('map',{center:[37.5450,127.0200],zoom:12,zoomControl:true});
+const map=L.map('map',{center:[37.555,126.995],zoom:11,zoomControl:true});
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+
+// Auto-fit to show all warehouses + orders
+function fitAllMarkers(){
+  const lats=[...WAREHOUSES,...ORDERS].map(p=>p.lat);
+  const lngs=[...WAREHOUSES,...ORDERS].map(p=>p.lng);
+  const pad=0.06;
+  map.fitBounds([
+    [Math.min(...lats)-pad, Math.min(...lngs)-pad],
+    [Math.max(...lats)+pad, Math.max(...lngs)+pad]
+  ],{animate:false});
+}
+setTimeout(fitAllMarkers, 400);
 
 TRAFFIC_ZONES.forEach(z=>{
   L.circle([z.lat,z.lng],{radius:z.r,color:'#fb923c',weight:1,fillColor:'#fb923c',fillOpacity:.07,dashArray:'4,4',opacity:.35}).addTo(map);
@@ -1100,7 +1112,7 @@ function onWhChange(){
     const wh=WAREHOUSES[parseInt(val)];
     map.flyTo([wh.lat,wh.lng],13,{animate:true,duration:1.4});
   } else {
-    map.flyTo([37.5450,127.0200],12,{animate:true,duration:1.2});
+    fitAllMarkers();
   }
 }
 
