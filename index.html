@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Coupang AI Route Optimizer — Seoul WoW</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0f1e;color:#e2e8f0;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+    header{background:#0d1220;border-bottom:1px solid #1a2540;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+    .hl{display:flex;align-items:center;gap:10px;}
+    .cpbadge{background:#e53e3e;color:#fff;font-weight:900;font-size:.8rem;padding:4px 10px;border-radius:5px;letter-spacing:.05em;}
+    header h1{font-size:.95rem;font-weight:700;color:#fff;}
+    header h1 span{color:#818cf8;}
+    .hbadges{display:flex;gap:6px;}
+    .hb{background:#111827;border:1px solid #1e2a4a;color:#64748b;font-size:.62rem;padding:2px 8px;border-radius:10px;font-weight:700;}
+    .hb.g{color:#4ade80;border-color:#166534;background:#052e16;}
+    .hb.b{color:#60a5fa;border-color:#1e40af;background:#0c1a3a;}
+
+    .controls{background:#0a0f1e;border-bottom:1px solid #1a2540;padding:7px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+    .mtoggle{display:flex;background:#111827;border-radius:6px;padding:2px;gap:2px;}
+    .mbtn{padding:5px 13px;border-radius:5px;border:none;cursor:pointer;font-size:.75rem;font-weight:700;transition:all .2s;background:transparent;color:#374151;}
+    .mbtn.active{background:#4f46e5;color:#fff;}
+    .btn{padding:5px 12px;border-radius:6px;border:none;cursor:pointer;font-size:.75rem;font-weight:700;transition:all .18s;}
+    .btn-run{background:#4f46e5;color:#fff;}.btn-run:hover{background:#4338ca;}.btn-run:disabled{opacity:.4;cursor:not-allowed;}
+    .btn-reset{background:#111827;color:#64748b;border:1px solid #1e2a4a;}
+    .btn-add{background:#065f46;color:#4ade80;border:1px solid #166534;}
+    .btn-add.active{background:#4ade80;color:#052e16;}
+    .dline{width:1px;height:18px;background:#1a2540;}
+    .whsel{background:#111827;border:1px solid #1e2a4a;color:#94a3b8;border-radius:5px;padding:4px 8px;font-size:.73rem;cursor:pointer;}
+    .spd{display:flex;align-items:center;gap:6px;color:#374151;font-size:.72rem;margin-left:auto;}
+    .spd input{accent-color:#4f46e5;width:70px;}
+
+    .body{display:flex;flex:1;overflow:hidden;min-height:0;}
+    #map-wrap{position:relative;flex:1;min-width:0;}
+    #map{width:100%;height:100%;}
+
+    /* Map tile inverted dark style */
+    .leaflet-tile{filter:invert(100%) hue-rotate(180deg) brightness(0.93) contrast(0.87) saturate(0.6);}
+    .leaflet-container{background:#1a2035;}
+    .leaflet-control-zoom{border:1px solid #1e2a4a!important;border-radius:6px!important;overflow:hidden;}
+    .leaflet-control-zoom a{background:#0d1220!important;color:#94a3b8!important;border-color:#1e2a4a!important;}
+    .leaflet-control-attribution{background:rgba(10,15,30,.8)!important;color:#374151!important;font-size:.55rem!important;}
+
+    /* Popup custom */
+    .leaflet-popup-content-wrapper{background:#0d1220;border:1px solid #2d3f6a;border-radius:12px;color:#e2e8f0;box-shadow:0 12px 40px rgba(0,0,0,.7);padding:0;overflow:hidden;}
+    .leaflet-popup-tip{background:#0d1220;}
+    .leaflet-popup-content{margin:0;font-size:.78rem;line-height:1.6;width:260px!important;}
+
+    /* Segment labels — high contrast */
+    .seg-lbl{background:rgba(0,0,0,.82);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:.62rem;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap;pointer-events:none;letter-spacing:.01em;text-shadow:0 1px 3px rgba(0,0,0,.8);}
+    .seg-lbl.ai{color:#4ade80;}
+    .seg-lbl.trad{color:#fca5a5;}
+
+    /* Phase banner */
+    #phase-banner{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(10,15,30,.92);border:1px solid #4f46e5;border-radius:20px;padding:5px 18px;font-size:.72rem;font-weight:700;color:#818cf8;backdrop-filter:blur(8px);pointer-events:none;display:none;white-space:nowrap;}
+
+    /* Add-order mode */
+    #add-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(5,46,22,.92);border:1px solid #166534;border-radius:20px;padding:6px 18px;font-size:.73rem;font-weight:700;color:#4ade80;pointer-events:none;display:none;}
+    .add-cursor{cursor:crosshair!important;}
+
+    /* Sidebar */
+    .sidebar{width:310px;flex-shrink:0;background:#0a0f1e;border-left:1px solid #1a2540;display:flex;flex-direction:column;overflow:hidden;}
+    .stabs{display:flex;border-bottom:1px solid #1a2540;flex-shrink:0;}
+    .stab{flex:1;padding:7px 3px;text-align:center;font-size:.6rem;font-weight:700;color:#374151;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid transparent;}
+    .stab.active{color:#818cf8;border-bottom-color:#4f46e5;background:#0d1220;}
+    .tc{display:none;flex:1;overflow-y:auto;padding:12px;flex-direction:column;gap:10px;}
+    .tc.active{display:flex;}
+
+    .panel{background:#0d1220;border:1px solid #1a2540;border-radius:9px;padding:12px;}
+    .ptitle{font-size:.58rem;text-transform:uppercase;letter-spacing:.09em;color:#2d3748;font-weight:800;margin-bottom:9px;}
+
+    .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+    .mc{background:#060b18;border-radius:7px;padding:8px 10px;border:1px solid #1a2540;}
+    .ml{font-size:.58rem;color:#2d3748;margin-bottom:2px;}
+    .mv{font-size:1.05rem;font-weight:800;}
+    .mv.g{color:#4ade80;}.mv.r{color:#f87171;}.mv.b{color:#60a5fa;}.mv.y{color:#fbbf24;}
+    .ms{font-size:.58rem;margin-top:1px;color:#2d3748;}
+    .ms.g{color:#4ade80;}.ms.r{color:#f87171;}
+
+    /* Route table */
+    .rtbl{width:100%;border-collapse:collapse;font-size:.66rem;}
+    .rtbl th{color:#2d3748;font-weight:700;text-align:left;padding:3px 4px;border-bottom:1px solid #1a2540;font-size:.58rem;text-transform:uppercase;}
+    .rtbl td{padding:4px;border-bottom:1px solid #060b18;vertical-align:middle;}
+    .rtbl tr:last-child td{border-bottom:none;}
+    .cdot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:3px;}
+
+    /* Savings */
+    .sv-banner{background:linear-gradient(135deg,#052e16,#0c1a2e);border:1px solid #166534;border-radius:9px;padding:12px;text-align:center;display:none;}
+    .sv-big{font-size:2.2rem;font-weight:900;color:#4ade80;line-height:1;}
+    .sv-sub{font-size:.62rem;color:#4ade80;opacity:.65;margin-top:2px;}
+    .sv-row{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px;}
+    .sv-cell{background:#060b18;border-radius:6px;padding:6px;border:1px solid #166534;text-align:center;}
+    .sv-val{font-size:.9rem;font-weight:800;color:#4ade80;}
+    .sv-lbl{font-size:.55rem;color:#374151;margin-top:1px;}
+
+    /* Order list */
+    .oi{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;background:#060b18;border-radius:7px;border:1px solid #1a2540;margin-bottom:5px;cursor:pointer;transition:border-color .2s;}
+    .oi:hover{border-color:#4f46e5;}
+    .on{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;flex-shrink:0;}
+    .oinf{flex:1;min-width:0;}
+    .oname{font-size:.72rem;font-weight:700;color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ometa{display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;}
+    .tbadge{font-size:.57rem;padding:1px 5px;border-radius:5px;font-weight:700;}
+    .t-rocket{background:#1e3a5f;color:#60a5fa;}
+    .t-fresh{background:#052e16;color:#4ade80;}
+    .t-eats{background:#3b1a00;color:#fb923c;}
+    .t-dawn{background:#1a0a2e;color:#a78bfa;}
+    .bbadge{font-size:.57rem;padding:1px 5px;border-radius:5px;background:#111827;color:#64748b;}
+    .otimes{text-align:right;flex-shrink:0;}
+    .dt{font-size:.65rem;font-weight:700;color:#94a3b8;}
+    .bt{font-size:.57rem;color:#64748b;margin-top:1px;}
+    .margin-chip{font-size:.62rem;font-weight:800;padding:1px 6px;border-radius:8px;}
+    .margin-pos{background:#052e16;color:#4ade80;}
+    .margin-neg{background:#450a0a;color:#f87171;}
+
+    /* Finance tab */
+    .fin-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #111827;font-size:.7rem;}
+    .fin-row:last-child{border-bottom:none;}
+    .fin-row .lbl{color:#64748b;}
+    .fin-row .val{font-weight:700;}
+    .fin-row .val.g{color:#4ade80;}
+    .fin-row .val.r{color:#f87171;}
+    .fin-row .val.y{color:#fbbf24;}
+    .margin-bar{height:6px;background:#1a2540;border-radius:3px;overflow:hidden;margin-top:4px;}
+    .margin-fill{height:100%;border-radius:3px;transition:width .6s ease;}
+
+    /* Algo steps */
+    .asteps{display:flex;flex-direction:column;gap:4px;}
+    .astep{display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border-radius:6px;border:1px solid transparent;opacity:.3;transition:all .3s;}
+    .astep.active{background:#0f1e3a;border-color:#2d4070;opacity:1;}
+    .astep.done{opacity:.6;}
+    .astep.done .asn{background:#166534;color:#4ade80;}
+    .asn{width:17px;height:17px;border-radius:50%;background:#111827;color:#374151;font-size:.58rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .astep.active .asn{background:#4f46e5;color:#fff;}
+    .asd{font-size:.68rem;line-height:1.4;color:#475569;}
+    .asd strong{color:#cbd5e1;display:block;font-size:.7rem;}
+
+    /* Warehouse tab */
+    .whi{display:flex;align-items:center;gap:8px;padding:7px 9px;background:#060b18;border-radius:7px;border:1px solid #1a2540;margin-bottom:5px;}
+    .wh-ico{width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:900;flex-shrink:0;}
+    .wh-inf{flex:1;min-width:0;}
+    .wh-nm{font-size:.7rem;font-weight:700;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .wh-sub{font-size:.58rem;color:#374151;}
+    .wh-cnt{font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:8px;}
+
+    /* Popup internal styles */
+    .pop-minimap{width:100%;height:110px;border-radius:0;}
+    .pop-body{padding:10px 12px;}
+    .pop-name{font-size:.85rem;font-weight:800;color:#fff;margin-bottom:4px;}
+    .pop-meta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+    .pop-section{margin-bottom:8px;}
+    .pop-section-title{font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:#374151;font-weight:800;margin-bottom:5px;}
+    .pop-row{display:flex;justify-content:space-between;font-size:.68rem;padding:2px 0;border-bottom:1px solid #111827;}
+    .pop-row:last-child{border-bottom:none;}
+    .pop-row .pk{color:#64748b;}
+    .pop-row .pv{font-weight:700;color:#e2e8f0;}
+    .pop-row .pv.g{color:#4ade80;}
+    .pop-row .pv.r{color:#f87171;}
+    .pop-row .pv.y{color:#fbbf24;}
+    .margin-result{background:#060b18;border-radius:6px;padding:8px;text-align:center;margin-top:6px;}
+    .margin-result .big{font-size:1.4rem;font-weight:900;}
+    .margin-result .lbl{font-size:.62rem;color:#64748b;margin-top:2px;}
+
+    /* Add order popup form */
+    .add-form{padding:12px;}
+    .add-form h3{font-size:.82rem;font-weight:800;color:#fff;margin-bottom:10px;}
+    .add-form label{display:block;font-size:.65rem;color:#64748b;margin-bottom:3px;margin-top:7px;}
+    .add-form input,.add-form select{width:100%;background:#111827;border:1px solid #1e2a4a;color:#e2e8f0;border-radius:5px;padding:5px 8px;font-size:.72rem;}
+    .add-form .add-submit{margin-top:10px;width:100%;background:#4f46e5;color:#fff;border:none;border-radius:6px;padding:7px;font-size:.75rem;font-weight:700;cursor:pointer;}
+    .add-form .add-cancel{margin-top:4px;width:100%;background:#111827;color:#64748b;border:1px solid #1e2a4a;border-radius:6px;padding:6px;font-size:.72rem;cursor:pointer;}
+
+    @keyframes driverPulse{0%,100%{box-shadow:0 0 18px var(--dc,#60a5fa),0 0 0 4px rgba(96,165,250,.3);}50%{box-shadow:0 0 28px var(--dc,#60a5fa),0 0 0 8px rgba(96,165,250,.1);}}
+    ::-webkit-scrollbar{width:3px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:#1a2540;border-radius:3px;}
+  </style>
+</head>
+<body>
+<header>
+  <div class="hl">
+    <div class="cpbadge">쿠팡</div>
+    <h1>AI <span>Route Optimizer</span> — Seoul WoW</h1>
+  </div>
+  <div class="hbadges">
+    <span class="hb g">4 Fulfillment Centers</span>
+    <span class="hb b" id="order-count-badge">12 WoW Orders</span>
+    <span class="hb">서울특별시</span>
+    <span class="hb">LIVE SIMULATION</span>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="mtoggle">
+    <button class="mbtn active" id="btn-trad" onclick="setMode('traditional')">Traditional</button>
+    <button class="mbtn" id="btn-ai" onclick="setMode('ai')">AI-Optimized</button>
+  </div>
+  <div class="dline"></div>
+  <button class="btn btn-run" id="btn-run" onclick="runSim()">▶ Run Simulation</button>
+  <button class="btn btn-reset" onclick="resetAll()">↺ Reset</button>
+  <button class="btn btn-add" id="btn-add" onclick="toggleAddMode()">📍 Add Order</button>
+  <div class="dline"></div>
+  <select class="whsel" id="wh-select" onchange="onWhChange()">
+    <option value="all">All Warehouses</option>
+    <option value="0">Goyang FC (고양)</option>
+    <option value="1">Namyangju FC (남양주)</option>
+    <option value="2">Bucheon FC (부천)</option>
+    <option value="3">Seongnam FC (성남)</option>
+  </select>
+  <div class="spd">Speed
+    <input type="range" id="spd" min="1" max="6" step=".5" value="2.5" oninput="speed=+this.value;document.getElementById('spdlbl').textContent=this.value+'×'">
+    <span id="spdlbl">2.5×</span>
+  </div>
+</div>
+
+<div class="body">
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="phase-banner"></div>
+    <div id="add-hint">📍 Click anywhere on the map to place a new delivery order</div>
+  </div>
+
+  <div class="sidebar">
+    <div class="stabs">
+      <div class="stab active" onclick="showTab('metrics')">Metrics</div>
+      <div class="stab" onclick="showTab('orders')">Orders</div>
+      <div class="stab" onclick="showTab('finance')">Finance</div>
+      <div class="stab" onclick="showTab('warehouses')">FCs</div>
+      <div class="stab" onclick="showTab('algo')">Algo</div>
+    </div>
+
+    <!-- METRICS -->
+    <div class="tc active" id="tab-metrics">
+      <div class="panel">
+        <div class="ptitle">Live Metrics</div>
+        <div class="mgrid">
+          <div class="mc"><div class="ml">Drivers</div><div class="mv b" id="m-drv">—</div><div class="ms" id="m-drv-s"></div></div>
+          <div class="mc"><div class="ml">Total Distance</div><div class="mv" id="m-dist">—</div><div class="ms" id="m-dist-s"></div></div>
+          <div class="mc"><div class="ml">Drive Time</div><div class="mv y" id="m-time">—</div><div class="ms" id="m-time-s"></div></div>
+          <div class="mc"><div class="ml">Cost / Drop</div><div class="mv" id="m-cost">—</div><div class="ms" id="m-cost-s"></div></div>
+          <div class="mc"><div class="ml">Building Delays</div><div class="mv" id="m-bldg">—</div><div class="ms" id="m-bldg-s"></div></div>
+          <div class="mc"><div class="ml">Deliveries</div><div class="mv g" id="m-del">—</div><div class="ms" id="m-del-s"></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">Route Breakdown</div>
+        <table class="rtbl">
+          <thead><tr><th>Route</th><th>Stops</th><th>km</th><th>Time</th><th>vs Trad</th></tr></thead>
+          <tbody id="route-tbody"><tr><td colspan="5" style="color:#2d3748;text-align:center;padding:10px;font-size:.67rem">Run simulation to see routes</td></tr></tbody>
+        </table>
+      </div>
+      <div class="panel sv-banner" id="sv-banner">
+        <div class="sv-big" id="sv-pct">—</div>
+        <div class="sv-sub">distance saved vs traditional routing</div>
+        <div class="sv-row">
+          <div class="sv-cell"><div class="sv-val" id="sv-km">—</div><div class="sv-lbl">km saved</div></div>
+          <div class="sv-cell"><div class="sv-val" id="sv-min">—</div><div class="sv-lbl">min saved</div></div>
+          <div class="sv-cell"><div class="sv-val" id="sv-cost">—</div><div class="sv-lbl">cost/drop</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="tc" id="tab-orders">
+      <div class="panel">
+        <div class="ptitle">WoW Order Types</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:4px">
+          <div style="background:#060b18;border:1px solid #1a2540;border-radius:6px;padding:6px"><div style="font-size:.58rem;color:#374151">🚀 Rocket</div><div style="font-size:.85rem;font-weight:800;color:#60a5fa" id="ct-rocket">—</div></div>
+          <div style="background:#060b18;border:1px solid #1a2540;border-radius:6px;padding:6px"><div style="font-size:.58rem;color:#374151">🌿 Fresh</div><div style="font-size:.85rem;font-weight:800;color:#4ade80" id="ct-fresh">—</div></div>
+          <div style="background:#060b18;border:1px solid #1a2540;border-radius:6px;padding:6px"><div style="font-size:.58rem;color:#374151">🍽️ Eats</div><div style="font-size:.85rem;font-weight:800;color:#fb923c" id="ct-eats">—</div></div>
+          <div style="background:#060b18;border:1px solid #1a2540;border-radius:6px;padding:6px"><div style="font-size:.58rem;color:#374151">🌙 Dawn</div><div style="font-size:.85rem;font-weight:800;color:#a78bfa" id="ct-dawn">—</div></div>
+        </div>
+      </div>
+      <div id="order-list"></div>
+    </div>
+
+    <!-- FINANCE -->
+    <div class="tc" id="tab-finance">
+      <div class="panel">
+        <div class="ptitle">Operational P&amp;L (per delivery)</div>
+        <div id="finance-mode-note" style="font-size:.65rem;color:#374151;margin-bottom:8px;text-align:center">Run simulation to see financials</div>
+        <div id="finance-rows"></div>
+      </div>
+      <div class="panel" id="fin-summary" style="display:none">
+        <div class="ptitle">Portfolio Summary</div>
+        <div id="fin-summary-rows"></div>
+        <div style="margin-top:8px">
+          <div style="display:flex;justify-content:space-between;font-size:.65rem;color:#64748b;margin-bottom:3px"><span>Gross Margin</span><span id="fin-margin-pct" style="font-weight:700"></span></div>
+          <div class="margin-bar"><div class="margin-fill" id="fin-margin-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">WoW Membership Model</div>
+        <div class="fin-row"><span class="lbl">Membership fee</span><span class="val y">₩4,990/mo</span></div>
+        <div class="fin-row"><span class="lbl">Avg orders/member/mo</span><span class="val">8.3</span></div>
+        <div class="fin-row"><span class="lbl">Subsidy per delivery</span><span class="val g">₩2,100</span></div>
+        <div class="fin-row"><span class="lbl">AI routing enables</span><span class="val g">Profitability</span></div>
+        <div class="fin-row"><span class="lbl">Without AI</span><span class="val r">Net loss/order</span></div>
+      </div>
+    </div>
+
+    <!-- WAREHOUSES -->
+    <div class="tc" id="tab-warehouses">
+      <div class="panel">
+        <div class="ptitle">Coupang Fulfillment Centers</div>
+        <div id="wh-list"></div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">Warehouse Assignments</div>
+        <div id="wh-assignments"><div style="color:#374151;text-align:center;font-size:.67rem;padding:8px">Run simulation to see assignments</div></div>
+      </div>
+    </div>
+
+    <!-- ALGO -->
+    <div class="tc" id="tab-algo">
+      <div class="panel">
+        <div class="ptitle">Algorithm Pipeline</div>
+        <div class="asteps" id="asteps">
+          <div class="astep" id="as0"><div class="asn">1</div><div class="asd"><strong>Order Intake</strong>WoW orders received across Seoul</div></div>
+          <div class="astep" id="as1"><div class="asn">2</div><div class="asd"><strong>Warehouse Assignment</strong>Orders routed to nearest FC (haversine)</div></div>
+          <div class="astep" id="as2"><div class="asn">3</div><div class="asd"><strong>Spatial Clustering</strong>K-means groups orders per FC zone</div></div>
+          <div class="astep" id="as3"><div class="asn">4</div><div class="asd"><strong>VRP Optimization</strong>Nearest-neighbor shortest path per cluster</div></div>
+          <div class="astep" id="as4"><div class="asn">5</div><div class="asd"><strong>Driver Dispatch</strong>Assign nearest available driver per cluster</div></div>
+          <div class="astep" id="as5"><div class="asn">6</div><div class="asd"><strong>Building Navigation</strong>Elevator/access time per stop calculated</div></div>
+          <div class="astep" id="as6"><div class="asn">7</div><div class="asd"><strong>Live Re-routing</strong>Traffic zones detected, ETA adjusted</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">Building Access Model</div>
+        <div class="fin-row"><span class="lbl">아파트 고층 (15F+)</span><span class="val y">+8 min</span></div>
+        <div class="fin-row"><span class="lbl">아파트 중층 (6–14F)</span><span class="val y">+6 min</span></div>
+        <div class="fin-row"><span class="lbl">오피스텔</span><span class="val y">+5 min</span></div>
+        <div class="fin-row"><span class="lbl">주택 / 상가</span><span class="val y">+2 min</span></div>
+        <div class="fin-row"><span class="lbl">택배함 locker</span><span class="val g">−2 min</span></div>
+      </div>
+      <div class="panel">
+        <div class="ptitle">Traffic Speed Model</div>
+        <div class="fin-row"><span class="lbl">Normal Seoul roads</span><span class="val">22 km/h</span></div>
+        <div class="fin-row"><span class="lbl">Traffic hotspot zone</span><span class="val r">11 km/h</span></div>
+        <div class="fin-row"><span class="lbl">🌙 Dawn (empty roads)</span><span class="val g">40 km/h</span></div>
+        <div class="fin-row"><span class="lbl">🍽️ Eats (priority)</span><span class="val g">28 km/h</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Data ──────────────────────────────────────────────────────────────────────
+const WAREHOUSES = [
+  {id:'WH-A',name:'쿠팡 고양물류센터',  en:'Goyang FC',    lat:37.6683,lng:126.8370,color:'#60a5fa',orders:[]},
+  {id:'WH-B',name:'쿠팡 남양주물류센터',en:'Namyangju FC', lat:37.6362,lng:127.2150,color:'#f472b6',orders:[]},
+  {id:'WH-C',name:'쿠팡 부천물류센터',  en:'Bucheon FC',   lat:37.5040,lng:126.7697,color:'#34d399',orders:[]},
+  {id:'WH-D',name:'쿠팡 성남물류센터',  en:'Seongnam FC',  lat:37.4380,lng:127.1380,color:'#fbbf24',orders:[]},
+];
+
+const ORDER_TYPES = {
+  rocket:{label:'🚀 Rocket',cls:'t-rocket',speed:22,icon:'🚀',revenue:7500},
+  fresh: {label:'🌿 Fresh', cls:'t-fresh', speed:22,icon:'🌿',revenue:8500},
+  eats:  {label:'🍽️ Eats',  cls:'t-eats',  speed:28,icon:'🍽️',revenue:6000},
+  dawn:  {label:'🌙 Dawn',  cls:'t-dawn',  speed:40,icon:'🌙',revenue:9000},
+};
+const BLDG = {
+  hirise:  {label:'아파트 고층',extra:8,cost:1200},
+  midrise: {label:'아파트 중층',extra:6,cost:900},
+  officetel:{label:'오피스텔', extra:5,cost:750},
+  ground:  {label:'주택/상가', extra:2,cost:300},
+};
+const PKG_COST = {rocket:200,fresh:800,eats:100,dawn:400};
+const FUEL_KM = 180, DRIVER_MIN = 240, FC_OVERHEAD = 600, TECH_COST = 80;
+
+let ORDERS = [
+  {id:1, lat:37.5172,lng:127.0473,name:'강남 (Gangnam)',    type:'rocket',bldg:'hirise',  floor:22,locker:false,desc:'Gangnam-gu luxury apartment block'},
+  {id:2, lat:37.5563,lng:126.9233,name:'홍대 (Hongdae)',    type:'eats',  bldg:'officetel',floor:8, locker:true, desc:'Hongik University area officetel'},
+  {id:3, lat:37.5637,lng:126.9828,name:'명동 (Myeongdong)', type:'rocket',bldg:'ground',  floor:1, locker:false,desc:'Myeongdong shopping district'},
+  {id:4, lat:37.5340,lng:126.9941,name:'이태원 (Itaewon)',  type:'fresh', bldg:'midrise', floor:11,locker:false,desc:'Itaewon international district'},
+  {id:5, lat:37.5596,lng:126.9368,name:'신촌 (Sinchon)',    type:'dawn',  bldg:'hirise',  floor:19,locker:false,desc:'Sinchon university neighborhood'},
+  {id:6, lat:37.5133,lng:127.1004,name:'잠실 (Jamsil)',     type:'rocket',bldg:'hirise',  floor:25,locker:true, desc:'Jamsil Lotte World Tower area'},
+  {id:7, lat:37.5707,lng:127.0095,name:'동대문 (Dongdaemun)',type:'eats',  bldg:'ground',  floor:2, locker:false,desc:'Dongdaemun Design Plaza area'},
+  {id:8, lat:37.5219,lng:126.9241,name:'여의도 (Yeouido)',  type:'fresh', bldg:'hirise',  floor:31,locker:false,desc:'Yeouido financial district'},
+  {id:9, lat:37.5260,lng:127.0286,name:'압구정 (Apgujeong)',type:'dawn',  bldg:'officetel',floor:14,locker:false,desc:'Apgujeong Rodeo luxury district'},
+  {id:10,lat:37.4847,lng:126.9298,name:'신림 (Sillim)',     type:'fresh', bldg:'midrise', floor:9, locker:true, desc:'Sillim residential zone'},
+  {id:11,lat:37.6084,lng:127.0606,name:'노원 (Nowon)',      type:'rocket',bldg:'hirise',  floor:17,locker:false,desc:'Nowon large apartment complex'},
+  {id:12,lat:37.5495,lng:127.1462,name:'강동 (Gangdong)',   type:'dawn',  bldg:'midrise', floor:12,locker:true, desc:'Gangdong new town area'},
+];
+
+const TRAFFIC_ZONES = [
+  {lat:37.5400,lng:127.0420,r:1100,name:'Gangnam-gu'},
+  {lat:37.5610,lng:126.9750,r:850, name:'Jung-gu'},
+  {lat:37.5100,lng:127.0600,r:700, name:'Jamsil'},
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function haversine(a,b){
+  const R=6371,r=Math.PI/180;
+  const dL=(b.lat-a.lat)*r,dl=(b.lng-a.lng)*r;
+  return R*2*Math.asin(Math.sqrt(Math.sin(dL/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dl/2)**2));
+}
+function mid(a,b){return{lat:(a.lat+b.lat)/2,lng:(a.lng+b.lng)/2};}
+function inTraffic(a,b){const m=mid(a,b);return TRAFFIC_ZONES.some(z=>haversine(m,z)*1000<z.r);}
+function travelTime(a,b,type){
+  const base=ORDER_TYPES[type]?.speed||22;
+  return (haversine(a,b)/(inTraffic(a,b)?base*.5:base))*60;
+}
+function bldgDelay(o){let t=BLDG[o.bldg]?.extra||2;if(o.locker)t=Math.max(1,t-2);if(o.type==='fresh')t+=1;return t;}
+
+function calcMargin(o,wh,mode,sharedStops){
+  const distOW=haversine(wh,o);
+  const driveOW=travelTime(wh,o,o.type);
+  const bldg=bldgDelay(o);
+  const revenue=ORDER_TYPES[o.type].revenue;
+  let dist,driveT;
+  if(mode==='traditional'){
+    dist=distOW*2; driveT=driveOW*2+bldg;
+  } else {
+    const ns=sharedStops||2.5;
+    dist=(distOW*1.4*2)/ns; driveT=(driveOW*1.4*2)/ns+bldg;
+  }
+  const fuel=Math.round(dist*FUEL_KM);
+  const driver=Math.round(driveT*DRIVER_MIN);
+  const bldgCost=Math.round(bldg*BLDG[o.bldg]?.cost||200);
+  const pkg=PKG_COST[o.type];
+  const fixed=FC_OVERHEAD+(mode==='ai'?TECH_COST:0);
+  const total=fuel+driver+bldgCost+pkg+fixed;
+  const margin=Math.round((revenue-total)/revenue*100);
+  return{revenue,fuel,driver,bldgCost,pkg,fixed,total,margin};
+}
+
+// ─── Map ──────────────────────────────────────────────────────────────────────
+const map=L.map('map',{center:[37.5450,127.0200],zoom:12,zoomControl:true});
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
+
+TRAFFIC_ZONES.forEach(z=>{
+  L.circle([z.lat,z.lng],{radius:z.r,color:'#fb923c',weight:1,fillColor:'#fb923c',fillOpacity:.07,dashArray:'4,4',opacity:.35}).addTo(map);
+});
+
+// Mini maps inside popups
+const miniMaps={};
+map.on('popupopen',function(e){
+  const el=e.popup.getElement();
+  if(!el)return;
+  const div=el.querySelector('.mini-map-init');
+  if(div&&!miniMaps[div.id]){
+    const lat=+div.dataset.lat,lng=+div.dataset.lng;
+    const mm=L.map(div.id,{center:[lat,lng],zoom:16,zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false});
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(mm);
+    L.circleMarker([lat,lng],{radius:7,color:'#e53e3e',fillColor:'#e53e3e',fillOpacity:1,weight:2}).addTo(mm);
+    miniMaps[div.id]=mm;
+    setTimeout(()=>mm.invalidateSize(),120);
+  }
+});
+map.on('popupclose',function(e){
+  const el=e.popup.getElement();
+  if(!el)return;
+  const div=el.querySelector('.mini-map-init');
+  if(div&&miniMaps[div.id]){miniMaps[div.id].remove();delete miniMaps[div.id];}
+});
+
+// Warehouse markers
+WAREHOUSES.forEach((w,i)=>{
+  const ico=L.divIcon({
+    html:`<div style="width:42px;height:42px;border-radius:8px;background:${w.color};display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;color:#0a0f1e;box-shadow:0 0 20px ${w.color}80,0 0 0 3px ${w.color}30;gap:0">
+      <div style="font-size:8px;opacity:.7">FC</div>
+      <div style="font-size:13px;line-height:1">${['고','남','부','성'][i]}</div>
+    </div>`,
+    className:'',iconSize:[42,42],iconAnchor:[21,21]
+  });
+  L.marker([w.lat,w.lng],{icon:ico,zIndexOffset:2000}).addTo(map)
+    .bindPopup(`<div class="pop-body"><div class="pop-name">🏭 ${w.name}</div><div style="font-size:.7rem;color:${w.color};margin-bottom:6px">${w.en}</div><div class="fin-row" style="font-size:.65rem"><span class="lbl">Coordinates</span><span class="val">${w.lat.toFixed(4)}°N, ${w.lng.toFixed(4)}°E</span></div><div class="fin-row" style="font-size:.65rem"><span class="lbl">Type</span><span class="val">Coupang Fulfillment Center</span></div><div class="fin-row" style="font-size:.65rem"><span class="lbl">Orders assigned</span><span class="val g">${w.orders.length}</span></div></div>`,{maxWidth:240});
+});
+
+// ─── Order markers ────────────────────────────────────────────────────────────
+let orderMarkers=[],mapLayers=[],animFrames=[];
+let currentMode='traditional',speed=2.5,simRunning=false,addMode=false;
+
+function makeOIcon(o,color,delivered){
+  const t=ORDER_TYPES[o.type];
+  const bg=delivered?'#16a34a':color;
+  return L.divIcon({
+    html:`<div style="position:relative;width:36px;height:36px">
+      <div style="width:36px;height:36px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;border:2.5px solid rgba(255,255,255,.35);box-shadow:0 0 14px rgba(0,0,0,.6),0 0 0 2px ${bg}40">${delivered?'✓':o.id}</div>
+      ${!delivered?`<div style="position:absolute;top:-5px;right:-5px;font-size:11px;background:#0a0f1e;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;border:1px solid #2d3748">${t.icon}</div>`:''}
+    </div>`,
+    className:'',iconSize:[36,36],iconAnchor:[18,18]
+  });
+}
+
+function makePopupHTML(o,mode){
+  const wh=WAREHOUSES[o.warehouseIdx??0];
+  const t=ORDER_TYPES[o.type];
+  const b=BLDG[o.bldg];
+  const delay=bldgDelay(o);
+  const driveM=Math.round(travelTime(wh,o,o.type));
+  const distKm=haversine(wh,o).toFixed(1);
+  const m=calcMargin(o,wh,mode||currentMode);
+  const sla=o.type==='eats'?'30 min':o.type==='dawn'?'by 7am':o.type==='fresh'?'2hr fresh':o.type==='rocket'?'next day':'—';
+  const mid_id=`mini-${o.id}-${Date.now()}`;
+  return `
+    <div class="mini-map-init" id="${mid_id}" data-lat="${o.lat}" data-lng="${o.lng}" style="width:100%;height:110px;border-radius:0"></div>
+    <div class="pop-body">
+      <div class="pop-name">#${o.id} ${o.name}</div>
+      <div class="pop-meta">
+        <span class="tbadge ${t.cls}">${t.label}</span>
+        <span class="bbadge">${b.label} F${o.floor}</span>
+        ${o.locker?'<span class="bbadge">📦 locker</span>':''}
+      </div>
+      <div style="font-size:.62rem;color:#64748b;margin-bottom:8px">${o.desc||''}</div>
+      <div class="pop-section">
+        <div class="pop-section-title">Logistics</div>
+        <div class="pop-row"><span class="pk">Warehouse</span><span class="pv" style="color:${wh.color}">${wh.en}</span></div>
+        <div class="pop-row"><span class="pk">Distance (one-way)</span><span class="pv">${distKm} km</span></div>
+        <div class="pop-row"><span class="pk">Drive time</span><span class="pv">~${driveM} min ${inTraffic(wh,o)?'🚦':''}</span></div>
+        <div class="pop-row"><span class="pk">Building access</span><span class="pv y">+${delay} min</span></div>
+        <div class="pop-row"><span class="pk">SLA target</span><span class="pv">${sla}</span></div>
+      </div>
+      <div class="pop-section">
+        <div class="pop-section-title">Operational P&L (${mode||currentMode})</div>
+        <div class="pop-row"><span class="pk">Revenue</span><span class="pv g">₩${m.revenue.toLocaleString()}</span></div>
+        <div class="pop-row"><span class="pk">Fuel cost</span><span class="pv r">−₩${m.fuel.toLocaleString()}</span></div>
+        <div class="pop-row"><span class="pk">Driver cost</span><span class="pv r">−₩${m.driver.toLocaleString()}</span></div>
+        <div class="pop-row"><span class="pk">Building delay</span><span class="pv r">−₩${m.bldgCost.toLocaleString()}</span></div>
+        <div class="pop-row"><span class="pk">Packaging</span><span class="pv r">−₩${m.pkg.toLocaleString()}</span></div>
+        <div class="pop-row"><span class="pk">FC overhead</span><span class="pv r">−₩${m.fixed.toLocaleString()}</span></div>
+        <div class="margin-result" style="background:#060b18;border:1px solid ${m.margin>0?'#166534':'#7f1d1d'}">
+          <div class="big" style="color:${m.margin>0?'#4ade80':'#f87171'}">${m.margin>0?'+':''}${m.margin}%</div>
+          <div style="font-size:.62rem;color:#64748b;margin-top:2px">Gross Margin · Total cost ₩${m.total.toLocaleString()}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function placeOrderMarkers(showCluster,delivered){
+  orderMarkers.forEach(m=>map.removeLayer(m));
+  orderMarkers=[];
+  ORDERS.forEach((o,i)=>{
+    const wIdx=o.warehouseIdx??0;
+    const color=showCluster?WAREHOUSES[wIdx].color:'#f87171';
+    const mk=L.marker([o.lat,o.lng],{icon:makeOIcon(o,color,delivered&&delivered.has(i)),zIndexOffset:500})
+      .addTo(map)
+      .bindPopup(makePopupHTML(o,currentMode),{maxWidth:270,minWidth:260,className:''});
+    orderMarkers.push(mk);
+  });
+}
+
+// ─── Segment label ────────────────────────────────────────────────────────────
+function addSegment(a,b,color,isAI,type){
+  const dist=haversine(a,b);
+  const mins=travelTime(a,b,type||'rocket');
+  const traffic=inTraffic(a,b);
+  const line=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color,weight:isAI?2.5:1.8,opacity:isAI?.9:.5,dashArray:isAI?null:'6,5'}).addTo(map);
+  const m=mid(a,b);
+  const lbl=L.marker([m.lat,m.lng],{
+    icon:L.divIcon({
+      html:`<div class="seg-lbl ${isAI?'ai':'trad'}">${dist.toFixed(1)} km · ~${Math.round(mins)}m${traffic?' 🚦':''}</div>`,
+      className:'',iconAnchor:[40,10]
+    }),interactive:false
+  }).addTo(map);
+  mapLayers.push(line,lbl);
+  return{dist,mins};
+}
+
+// ─── Driver animation ─────────────────────────────────────────────────────────
+function makeDriverIcon(label,color){
+  return L.divIcon({
+    html:`<div style="position:relative;width:32px;height:32px">
+      <div style="width:32px;height:32px;border-radius:50%;background:#1e3a8a;border:3px solid ${color};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;box-shadow:0 0 18px ${color},0 0 0 4px ${color}30;animation:driverPulse 1.2s ease-in-out infinite">${label}</div>
+    </div>`,
+    className:'',iconSize:[32,32],iconAnchor:[16,16]
+  });
+}
+
+function animateDriver(waypoints,color,label,onDone,deliveredSet,orderIdxList,type){
+  // Show departure flash at warehouse
+  const whPt=waypoints[0];
+  const flashCircle=L.circleMarker([whPt.lat,whPt.lng],{
+    radius:14,color,weight:2,fillColor:color,fillOpacity:.25,opacity:.8
+  }).addTo(map);
+  mapLayers.push(flashCircle);
+  setTimeout(()=>{try{map.removeLayer(flashCircle);}catch(e){}},1000);
+
+  const mk=L.marker([whPt.lat,whPt.lng],{
+    icon:makeDriverIcon(label,color),zIndexOffset:900
+  }).addTo(map);
+  mapLayers.push(mk);
+
+  let seg=0,prog=0;
+  // Speed: slower base so warehouse→stop leg is visible (divide by 1.6)
+  const BASE_SPEED=0.0018;
+
+  function frame(){
+    if(seg>=waypoints.length-1){
+      mk.setLatLng([waypoints[waypoints.length-1].lat,waypoints[waypoints.length-1].lng]);
+      onDone();return;
+    }
+    const f=waypoints[seg],t=waypoints[seg+1];
+    const dist=haversine(f,t);
+    const kmhSpeed=(ORDER_TYPES[type]?.speed||22)*(inTraffic(f,t)?.5:1);
+    prog+=((kmhSpeed/22)*speed*BASE_SPEED)/Math.max(0.1,dist);
+    if(prog>=1){
+      prog=0;seg++;
+      const pt=waypoints[seg];
+      if(seg<waypoints.length-1){
+        orderIdxList.forEach(oi=>{
+          const o=ORDERS[oi];
+          if(Math.abs(o.lat-pt.lat)<.002&&Math.abs(o.lng-pt.lng)<.002){
+            deliveredSet.add(oi);
+            placeOrderMarkers(currentMode==='ai',deliveredSet);
+          }
+        });
+      }
+    }
+    const ff=waypoints[seg],tt=waypoints[seg+1]||ff;
+    mk.setLatLng([ff.lat+(tt.lat-ff.lat)*prog,ff.lng+(tt.lng-ff.lng)*prog]);
+    animFrames.push(requestAnimationFrame(frame));
+  }
+  animFrames.push(requestAnimationFrame(frame));
+}
+
+// ─── Warehouse assignment ─────────────────────────────────────────────────────
+function assignOrders(whFilter){
+  WAREHOUSES.forEach(w=>w.orders=[]);
+  ORDERS.forEach((o,i)=>{
+    if(whFilter!=='all'){
+      const wi=parseInt(whFilter);
+      WAREHOUSES[wi].orders.push(i);
+      o.warehouseIdx=wi;
+    } else {
+      let best=0,bestD=Infinity;
+      WAREHOUSES.forEach((w,wi)=>{const d=haversine(w,o);if(d<bestD){bestD=d;best=wi;}});
+      WAREHOUSES[best].orders.push(i);
+      o.warehouseIdx=best;
+    }
+  });
+}
+
+// ─── Simulations ─────────────────────────────────────────────────────────────
+function runTraditional(){
+  setStep(0);
+  setPhaseBanner('Traditional — 1 driver per order, no batching or warehouse optimization');
+  placeOrderMarkers(false,null);
+  let totalDist=0,totalMins=0,totalBldg=0;
+  ORDERS.forEach((o,i)=>{
+    const wh=WAREHOUSES[o.warehouseIdx];
+    const s1=addSegment(wh,o,'#f87171',false,o.type);
+    const s2=addSegment(o,wh,'#f87171',false,o.type);
+    totalDist+=s1.dist+s2.dist;
+    totalMins+=s1.mins+s2.mins+bldgDelay(o);
+    totalBldg+=bldgDelay(o);
+  });
+  updateMetrics({mode:'traditional',drivers:ORDERS.length,dist:totalDist,mins:totalMins,bldg:totalBldg,del:ORDERS.length});
+  populateRouteTrad(totalDist,totalMins);
+  updateFinance('traditional');
+  const delivered=new Set();
+  let done=0;
+  ORDERS.forEach((o,i)=>{
+    const wh=WAREHOUSES[o.warehouseIdx];
+    setTimeout(()=>{
+      animateDriver([wh,o,wh],WAREHOUSES[o.warehouseIdx].color,`D${i+1}`,()=>{
+        done++;
+        if(done===ORDERS.length){setPhaseBanner(`✓ Traditional — ${totalDist.toFixed(1)} km · ~${Math.round(totalMins)} min`);document.getElementById('btn-run').disabled=false;simRunning=false;}
+      },delivered,[i],o.type);
+    },i*60);
+  });
+}
+
+function runAI(){
+  setStep(0);setPhaseBanner('Step 1 — WoW orders received from across Seoul…');
+  placeOrderMarkers(false,null);
+  setTimeout(()=>{
+    setStep(1);setPhaseBanner('Step 2 — Assigning each order to nearest Coupang FC…');
+    placeOrderMarkers(true,null);
+    // Temp assignment lines
+    const tl=[];
+    ORDERS.forEach(o=>{
+      const wh=WAREHOUSES[o.warehouseIdx];
+      const l=L.polyline([[wh.lat,wh.lng],[o.lat,o.lng]],{color:wh.color,weight:1,opacity:.35,dashArray:'3,6'}).addTo(map);
+      tl.push(l);mapLayers.push(l);
+    });
+    renderWhAssignments();showTab('warehouses');
+
+    setTimeout(()=>{
+      setStep(2);setPhaseBanner('Step 3 — Clustering orders by FC zone…');
+      tl.forEach(l=>map.removeLayer(l));
+      const allClusters=[];
+      WAREHOUSES.forEach((wh,wi)=>{
+        if(!wh.orders.length)return;
+        if(wh.orders.length>1){
+          const pts=wh.orders.map(oi=>ORDERS[oi]);
+          const clat=pts.reduce((s,p)=>s+p.lat,0)/pts.length;
+          const clng=pts.reduce((s,p)=>s+p.lng,0)/pts.length;
+          const r=Math.max(...pts.map(p=>haversine({lat:clat,lng:clng},p)))+0.8;
+          const c=L.circle([clat,clng],{radius:r*1000,color:wh.color,weight:1.5,fillColor:wh.color,fillOpacity:.06,dashArray:'6,4',opacity:.45}).addTo(map);
+          mapLayers.push(c);
+        }
+        const bsz=3;const ords=[...wh.orders];
+        while(ords.length){allClusters.push({wh,whIdx:wi,orders:ords.splice(0,bsz)});}
+      });
+
+      setTimeout(()=>{
+        setStep(3);setPhaseBanner('Step 4 — VRP solver: computing shortest paths per cluster…');
+        let totalDist=0,totalMins=0,totalBldg=0;
+        const routeData=[];
+        allClusters.forEach(c=>{
+          const wh=c.wh;
+          const stops=c.orders.map(oi=>ORDERS[oi]);
+          const route=[wh];let cur={...wh};const rem=[...stops];
+          while(rem.length){let best=null,bd=Infinity,bi=-1;rem.forEach((s,i)=>{const d=haversine(cur,s);if(d<bd){bd=d;best=s;bi=i;}});route.push(best);cur=best;rem.splice(bi,1);}
+          route.push(wh);
+          let cd=0,cm=0;
+          for(let i=0;i<route.length-1;i++){const s=addSegment(route[i],route[i+1],c.wh.color,true,stops[0]?.type||'rocket');cd+=s.dist;cm+=s.mins;}
+          const bl=c.orders.reduce((s,oi)=>s+bldgDelay(ORDERS[oi]),0);
+          const td=c.orders.reduce((s,oi)=>s+haversine(wh,ORDERS[oi])*2,0);
+          totalDist+=cd;totalMins+=cm+bl;totalBldg+=bl;
+          routeData.push({c,route,cDist:cd,cMins:cm,bldg:bl,tradDist:td});
+        });
+        // Register step chain FIRST — before any render that could throw
+        setTimeout(()=>{
+          setStep(4);setPhaseBanner('Step 5 — Dispatching drivers to clusters…');
+          setTimeout(()=>{
+            setStep(5);setPhaseBanner('Step 6 — Calculating building access time per stop…');
+            setTimeout(()=>{
+              setStep(6);setPhaseBanner('Step 7 — Drivers en route, traffic zones being avoided…');
+              const delivered=new Set();let done=0;
+              routeData.forEach((rd,ri)=>{
+                const mtype=ORDERS[rd.orders[0]]?.type||'rocket';
+                animateDriver(rd.route,rd.c.wh.color,`D${ri+1}`,()=>{
+                  done++;
+                  if(done===routeData.length){
+                    try{
+                      const tTot=ORDERS.reduce((s,o)=>s+haversine(WAREHOUSES[o.warehouseIdx],o)*2,0);
+                      const tMin=ORDERS.reduce((s,o)=>s+travelTime(WAREHOUSES[o.warehouseIdx],o,o.type)*2+bldgDelay(o),0);
+                      showSavings(totalDist,totalMins,tTot,tMin,allClusters.length);
+                    }catch(e){console.warn('savings',e);}
+                    setPhaseBanner(`✓ AI routing complete — ${totalDist.toFixed(1)} km · ~${Math.round(totalMins)} min`);
+                    document.getElementById('btn-run').disabled=false;simRunning=false;
+                  }
+                },delivered,rd.orders,mtype);
+              });
+            },600);
+          },800);
+        },1000);
+
+        // Render panels safely after scheduling step chain
+        try{updateMetrics({mode:'ai',drivers:allClusters.length,dist:totalDist,mins:totalMins,bldg:totalBldg,del:ORDERS.length});}catch(e){console.warn('metrics',e);}
+        try{populateRouteAI(routeData,totalDist,totalMins);}catch(e){console.warn('routeTable',e);}
+        try{updateFinance('ai',allClusters);}catch(e){console.warn('finance',e);}
+        try{showTab('metrics');}catch(e){}
+      },1000);
+    },1800);
+  },900);
+}
+
+// ─── Metrics ─────────────────────────────────────────────────────────────────
+function updateMetrics({mode,drivers,dist,mins,bldg,del}){
+  const cost=(dist*FUEL_KM/del).toFixed(0);
+  const setEl=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  const setCls=(id,c)=>{const e=document.getElementById(id);if(e)e.className='mv '+c;};
+  setEl('m-drv',drivers);setCls('m-drv',mode==='ai'?'g b':'r');
+  setEl('m-drv-s',mode==='ai'?`↓ ${ORDERS.length-drivers} fewer`:'1 per order');
+  document.getElementById('m-drv-s').className='ms '+(mode==='ai'?'g':'r');
+  setEl('m-dist',dist.toFixed(1)+' km');
+  setEl('m-time',Math.round(mins)+' min');
+  setEl('m-cost','₩'+parseInt(cost).toLocaleString());
+  setCls('m-cost',mode==='ai'?'g':'r');
+  document.getElementById('m-cost-s').className='ms '+(mode==='ai'?'g':'r');
+  setEl('m-cost-s',mode==='ai'?'↓ ~60% lower':'high cost per drop');
+  setEl('m-bldg',Math.round(bldg)+' min');
+  setEl('m-bldg-s','building access total');
+  setEl('m-del',del+'/'+ORDERS.length);
+}
+
+function populateRouteTrad(totalDist,totalMins){
+  let rows='';
+  ORDERS.forEach(o=>{
+    const wh=WAREHOUSES[o.warehouseIdx];
+    const d=(haversine(wh,o)*2).toFixed(1);
+    const m=Math.round(travelTime(wh,o,o.type)*2+bldgDelay(o));
+    rows+=`<tr><td><span class="cdot" style="background:${wh.color}"></span>${ORDER_TYPES[o.type].icon}${o.name.split('(')[1]?.replace(')','')}</td><td>1</td><td style="color:#fca5a5">${d}</td><td style="color:#fca5a5">${m}m</td><td style="color:#374151">—</td></tr>`;
+  });
+  rows+=`<tr style="border-top:1px solid #1a2540"><td colspan="2" style="color:#cbd5e1;font-weight:700">Total</td><td style="color:#f87171;font-weight:700">${totalDist.toFixed(1)}</td><td style="color:#f87171;font-weight:700">${Math.round(totalMins)}m</td><td></td></tr>`;
+  document.getElementById('route-tbody').innerHTML=rows;
+}
+
+function populateRouteAI(routeData,totalDist,totalMins){
+  const tTot=ORDERS.reduce((s,o)=>s+haversine(WAREHOUSES[o.warehouseIdx],o)*2,0);
+  let rows='';
+  routeData.forEach((rd,ri)=>{
+    const pct=Math.round((1-rd.cDist/rd.tradDist)*100);
+    const whName=rd.c.wh.en.split(' ')[0];
+    rows+=`<tr><td><span class="cdot" style="background:${rd.c.wh.color}"></span>${whName} R${ri+1}</td><td>${rd.orders.length}</td><td style="color:#4ade80">${rd.cDist.toFixed(1)}</td><td style="color:#4ade80">${Math.round(rd.cMins+rd.bldg)}m</td><td style="color:#4ade80">↓${pct}%</td></tr>`;
+  });
+  const pctO=Math.round((1-totalDist/tTot)*100);
+  rows+=`<tr style="border-top:1px solid #1a2540"><td colspan="2" style="color:#cbd5e1;font-weight:700">Total</td><td style="color:#4ade80;font-weight:700">${totalDist.toFixed(1)}</td><td style="color:#4ade80;font-weight:700">${Math.round(totalMins)}m</td><td style="color:#4ade80;font-weight:700">↓${pctO}%</td></tr>`;
+  document.getElementById('route-tbody').innerHTML=rows;
+}
+
+function showSavings(aiDist,aiMins,tradDist,tradMins,drivers){
+  const pct=Math.round((1-aiDist/tradDist)*100);
+  document.getElementById('sv-pct').textContent=pct+'%';
+  document.getElementById('sv-km').textContent=(tradDist-aiDist).toFixed(1);
+  document.getElementById('sv-min').textContent=Math.round(tradMins-aiMins);
+  document.getElementById('sv-cost').textContent='₩'+(aiDist*FUEL_KM/ORDERS.length).toFixed(0);
+  document.getElementById('sv-banner').style.display='block';
+}
+
+// ─── Finance tab ──────────────────────────────────────────────────────────────
+function updateFinance(mode,clusters){
+  const finNote=document.getElementById('finance-mode-note');
+  if(finNote)finNote.textContent=mode==='ai'?'AI-Optimized routing':'Traditional routing (1 driver/order)';
+  const sharedStops=clusters?ORDERS.length/clusters.length:1;
+  let totalRev=0,totalCost=0;
+  let rows='';
+  const types=['rocket','fresh','eats','dawn'];
+  types.forEach(t=>{
+    const typeOrders=ORDERS.filter(o=>o.type===t);
+    if(!typeOrders.length)return;
+    const avgM=typeOrders.reduce((s,o)=>{const wh=WAREHOUSES[o.warehouseIdx];return s+calcMargin(o,wh,mode,sharedStops).margin;},0)/typeOrders.length;
+    const color=avgM>0?'#4ade80':'#f87171';
+    totalRev+=typeOrders.reduce((s,o)=>s+ORDER_TYPES[o.type].revenue,0);
+    totalCost+=typeOrders.reduce((s,o)=>{const wh=WAREHOUSES[o.warehouseIdx];return s+calcMargin(o,wh,mode,sharedStops).total;},0);
+    const barW=Math.min(100,Math.max(0,50+avgM/2));
+    rows+=`<div style="margin-bottom:8px">
+      <div class="fin-row"><span class="lbl">${ORDER_TYPES[t].icon} ${ORDER_TYPES[t].label.split(' ')[1]} (${typeOrders.length} orders)</span><span class="val" style="color:${color}">${avgM>0?'+':''}${avgM.toFixed(0)}% margin</span></div>
+      <div class="margin-bar"><div class="margin-fill" style="width:${barW}%;background:${color}"></div></div>
+    </div>`;
+  });
+  document.getElementById('finance-rows').innerHTML=rows;
+
+  const overallMargin=Math.round((totalRev-totalCost)/totalRev*100);
+  const summaryEl=document.getElementById('fin-summary');
+  if(summaryEl){
+    summaryEl.style.display='block';
+    const color=overallMargin>0?'#4ade80':'#f87171';
+    document.getElementById('fin-summary-rows').innerHTML=`
+      <div class="fin-row"><span class="lbl">Total Revenue</span><span class="val g">₩${totalRev.toLocaleString()}</span></div>
+      <div class="fin-row"><span class="lbl">Total Costs</span><span class="val r">₩${totalCost.toLocaleString()}</span></div>
+      <div class="fin-row"><span class="lbl">Net</span><span class="val" style="color:${color}">₩${(totalRev-totalCost).toLocaleString()}</span></div>`;
+    document.getElementById('fin-margin-pct').textContent=(overallMargin>0?'+':'')+overallMargin+'%';
+    document.getElementById('fin-margin-pct').style.color=color;
+    document.getElementById('fin-margin-bar').style.width=Math.min(100,Math.max(0,50+overallMargin/2))+'%';
+    document.getElementById('fin-margin-bar').style.background=color;
+  }
+}
+
+// ─── Add order mode ───────────────────────────────────────────────────────────
+function toggleAddMode(){
+  addMode=!addMode;
+  document.getElementById('btn-add').classList.toggle('active',addMode);
+  document.getElementById('add-hint').style.display=addMode?'block':'none';
+  document.getElementById('map-wrap').style.cursor=addMode?'crosshair':'';
+}
+
+let addPopup=null;
+map.on('click',function(e){
+  if(!addMode)return;
+  if(addPopup){map.closePopup(addPopup);addPopup=null;}
+  const {lat,lng}=e.latlng;
+  const newId=Math.max(...ORDERS.map(o=>o.id))+1;
+  const form=document.createElement('div');
+  form.className='add-form';
+  form.innerHTML=`
+    <h3>📍 New Delivery Order #${newId}</h3>
+    <div style="font-size:.63rem;color:#374151;margin-bottom:6px">${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E</div>
+    <label>Nickname / Location Name</label>
+    <input id="af-name" placeholder="e.g. 강북 (Gangbuk)" value="Custom #${newId}"/>
+    <label>Order Type</label>
+    <select id="af-type">
+      <option value="rocket">🚀 Rocket Delivery (₩7,500)</option>
+      <option value="fresh">🌿 Rocket Fresh (₩8,500)</option>
+      <option value="eats">🍽️ Coupang Eats (₩6,000)</option>
+      <option value="dawn">🌙 Dawn Delivery (₩9,000)</option>
+    </select>
+    <label>Building Type</label>
+    <select id="af-bldg">
+      <option value="hirise">아파트 고층 (15F+) +8min</option>
+      <option value="midrise">아파트 중층 (6–14F) +6min</option>
+      <option value="officetel">오피스텔 +5min</option>
+      <option value="ground">주택/상가 +2min</option>
+    </select>
+    <label>Floor Number</label>
+    <input id="af-floor" type="number" value="10" min="1" max="60"/>
+    <label><input type="checkbox" id="af-locker"/> 택배함 (parcel locker available)</label>
+    <button class="add-submit" onclick="submitNewOrder(${lat},${lng},${newId})">Add Order to Simulation</button>
+    <button class="add-cancel" onclick="cancelAddOrder()">Cancel</button>
+  `;
+  addPopup=L.popup({maxWidth:260,className:''}).setLatLng(e.latlng).setContent(form).openOn(map);
+});
+
+function submitNewOrder(lat,lng,id){
+  const name=document.getElementById('af-name')?.value||`Order #${id}`;
+  const type=document.getElementById('af-type')?.value||'rocket';
+  const bldg=document.getElementById('af-bldg')?.value||'midrise';
+  const floor=parseInt(document.getElementById('af-floor')?.value)||10;
+  const locker=document.getElementById('af-locker')?.checked||false;
+  ORDERS.push({id,lat,lng,name,type,bldg,floor,locker,desc:'Custom order added via map'});
+  map.closePopup();
+  addMode=false;
+  document.getElementById('btn-add').classList.remove('active');
+  document.getElementById('add-hint').style.display='none';
+  document.getElementById('map-wrap').style.cursor='';
+  document.getElementById('order-count-badge').textContent=ORDERS.length+' WoW Orders';
+  resetAll();
+  showTab('orders');
+}
+function cancelAddOrder(){map.closePopup();toggleAddMode();}
+
+// ─── Warehouse dropdown zoom ──────────────────────────────────────────────────
+function onWhChange(){
+  const val=document.getElementById('wh-select').value;
+  resetAll();
+  if(val!=='all'){
+    const wh=WAREHOUSES[parseInt(val)];
+    map.flyTo([wh.lat,wh.lng],13,{animate:true,duration:1.4});
+  } else {
+    map.flyTo([37.5450,127.0200],12,{animate:true,duration:1.2});
+  }
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function setStep(n){
+  document.querySelectorAll('.astep').forEach((el,i)=>{
+    el.classList.remove('active','done');
+    if(i<n)el.classList.add('done');
+    if(i===n)el.classList.add('active');
+  });
+}
+function setPhaseBanner(txt){
+  const b=document.getElementById('phase-banner');
+  b.style.display=txt?'block':'none';
+  b.textContent=txt;
+}
+function showTab(name){
+  document.querySelectorAll('.stab,.tc').forEach(el=>el.classList.remove('active'));
+  const names=['metrics','orders','finance','warehouses','algo'];
+  names.forEach((n,i)=>{if(n===name){document.querySelectorAll('.stab')[i]?.classList.add('active');}});
+  const tc=document.getElementById('tab-'+name);
+  if(tc)tc.classList.add('active');
+}
+function setMode(m){
+  currentMode=m;
+  document.getElementById('btn-trad').classList.toggle('active',m==='traditional');
+  document.getElementById('btn-ai').classList.toggle('active',m==='ai');
+  resetAll();
+}
+function clearMapLayers(){mapLayers.forEach(l=>{try{map.removeLayer(l);}catch(e){}});mapLayers=[];}
+
+function renderOrderList(){
+  const counts={rocket:0,fresh:0,eats:0,dawn:0};
+  ORDERS.forEach(o=>counts[o.type]++);
+  Object.entries(counts).forEach(([k,v])=>{const e=document.getElementById('ct-'+k);if(e)e.textContent=v+' orders';});
+  let html='';
+  ORDERS.forEach((o,i)=>{
+    const wh=WAREHOUSES[o.warehouseIdx??0];
+    const t=ORDER_TYPES[o.type];
+    const b=BLDG[o.bldg];
+    const delay=bldgDelay(o);
+    const dm=Math.round(travelTime(wh,o,o.type));
+    const m=calcMargin(o,wh,currentMode);
+    const mc=m.margin>0?'margin-pos':'margin-neg';
+    html+=`<div class="oi" onclick="orderMarkers[${i}]?.openPopup()">
+      <div class="on" style="background:${wh.color}20;color:${wh.color};border:1px solid ${wh.color}30">${o.id}</div>
+      <div class="oinf">
+        <div class="oname">${o.name}</div>
+        <div class="ometa">
+          <span class="tbadge ${t.cls}">${t.label}</span>
+          <span class="bbadge">${b.label} F${o.floor}</span>
+          ${o.locker?'<span class="bbadge">📦</span>':''}
+        </div>
+        <div style="font-size:.58rem;color:#374151;margin-top:2px">${wh.en}</div>
+      </div>
+      <div class="otimes">
+        <div class="dt">~${dm} min</div>
+        <div class="bt">+${delay}m bldg</div>
+        <div class="margin-chip ${mc} mt-1">${m.margin>0?'+':''}${m.margin}%</div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('order-list').innerHTML=html;
+}
+
+function renderWhList(){
+  let html='';
+  WAREHOUSES.forEach((w,i)=>{
+    html+=`<div class="whi">
+      <div class="wh-ico" style="background:${w.color}20;border:1px solid ${w.color}40;color:${w.color}">${w.id.replace('WH-','')}</div>
+      <div class="wh-inf">
+        <div class="wh-nm">${w.name}</div>
+        <div class="wh-sub">${w.lat.toFixed(4)}°N ${w.lng.toFixed(4)}°E</div>
+      </div>
+      <div class="wh-cnt" style="background:${w.color}15;color:${w.color}">${w.orders.length} orders</div>
+    </div>`;
+  });
+  document.getElementById('wh-list').innerHTML=html;
+}
+
+function renderWhAssignments(){
+  let html='';
+  WAREHOUSES.forEach(w=>{
+    if(!w.orders.length)return;
+    html+=`<div style="margin-bottom:8px"><div style="color:${w.color};font-weight:700;font-size:.67rem;margin-bottom:3px">${w.en} (${w.orders.length})</div>`;
+    w.orders.forEach(oi=>{
+      const o=ORDERS[oi];
+      const d=haversine(w,o).toFixed(1);
+      html+=`<div style="display:flex;justify-content:space-between;padding:2px 6px;background:#060b18;border-radius:4px;margin-bottom:2px;font-size:.65rem"><span>${ORDER_TYPES[o.type].icon} ${o.name.split('(')[1]?.replace(')','')??o.name}</span><span style="color:#4ade80">${d} km</span></div>`;
+    });
+    html+='</div>';
+  });
+  document.getElementById('wh-assignments').innerHTML=html||'<div style="color:#374151;text-align:center;font-size:.67rem;padding:8px">No assignments</div>';
+}
+
+function resetAll(){
+  animFrames.forEach(cancelAnimationFrame);animFrames=[];
+  clearMapLayers();
+  const wf=document.getElementById('wh-select').value;
+  assignOrders(wf);
+  placeOrderMarkers(false,null);
+  renderOrderList();renderWhList();renderWhAssignments();
+  setStep(-1);setPhaseBanner('');
+  document.getElementById('sv-banner').style.display='none';
+  ['m-drv','m-dist','m-time','m-cost','m-bldg','m-del'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='—';});
+  ['m-drv-s','m-dist-s','m-time-s','m-cost-s','m-bldg-s','m-del-s'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='';});
+  document.getElementById('route-tbody').innerHTML='<tr><td colspan="5" style="color:#2d3748;text-align:center;padding:10px;font-size:.67rem">Run simulation to see routes</td></tr>';
+  const fs=document.getElementById('fin-summary');if(fs)fs.style.display='none';
+  document.getElementById('finance-rows').innerHTML='';
+  document.getElementById('finance-mode-note').textContent='Run simulation to see financials';
+  document.getElementById('btn-run').disabled=false;
+  simRunning=false;
+  showTab('metrics');
+}
+
+function runSim(){
+  if(simRunning)return;
+  simRunning=true;
+  document.getElementById('btn-run').disabled=true;
+  resetAll();simRunning=true;
+  if(currentMode==='traditional')runTraditional();else runAI();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+assignOrders('all');
+renderOrderList();renderWhList();renderWhAssignments();
+placeOrderMarkers(false,null);
+</script>
+</body>
+</html>
