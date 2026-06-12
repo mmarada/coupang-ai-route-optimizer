@@ -632,7 +632,7 @@ function animateDriver(waypoints, color, label, onDone, deliveredSet, orderIdxLi
   mapLayers.push(mk);
 
   let seg=0, prog=0, paused=false;
-  const BASE=0.0019;
+  const BASE=0.028; // 10km leg @ 2.5× ≈ 2.5s — clearly visible
 
   function setState(state, text){
     liveDrivers[dKey] = {...liveDrivers[dKey], state, statusText:text};
@@ -670,7 +670,7 @@ function animateDriver(waypoints, color, label, onDone, deliveredSet, orderIdxLi
         if(delivOI !== undefined){
           const order = ORDERS[delivOI];
           const delay = bldgDelay(order);
-          const pauseMs = Math.max(800, (delay*600)/speed);
+          const pauseMs = Math.max(500, (delay*250)/speed);
 
           setState('arriving', `Arriving at ${order.name.split('(')[0].trim()}…`);
           paused=true;
@@ -828,7 +828,7 @@ function runAI(){
   setStep(0); setPhaseBanner('Step 1 — WoW orders received from across Seoul…');
   placeOrderMarkers(false, null);
 
-  // STEP 2 — warehouse assignment (900ms)
+  // STEP 2 — warehouse assignment
   setTimeout(()=>{
     setStep(1); setPhaseBanner('Step 2 — Assigning each order to nearest Coupang FC…');
     placeOrderMarkers(true, null);
@@ -840,7 +840,7 @@ function runAI(){
     });
     renderWhAssignments(); showTab('warehouses');
 
-    // STEP 3 — cluster + draw circles (1600ms)
+    // STEP 3 — cluster + draw circles
     setTimeout(()=>{
       setStep(2); setPhaseBanner('Step 3 — Clustering orders by FC zone…');
       tl.forEach(l=>map.removeLayer(l));
@@ -901,9 +901,12 @@ function runAI(){
                 setStep(6); setPhaseBanner('Step 7 — Drivers en route — watch real-time delivery states…');
                 const delivered=new Set(); let done=0;
                 routeData.forEach((rd,ri)=>{
-                  const mtype=ORDERS[rd.orders[0]]?.type||'rocket';
-                  const dLabel=rd.c.splitNote ? `D${ri+1}${rd.c.splitGroup||''}` : `D${ri+1}`;
-                  animateDriver(rd.route,rd.c.wh.color,dLabel,()=>{
+                  const clusterOrders = rd.c.orders;                     // ← fix: was rd.orders
+                  const mtype = ORDERS[clusterOrders[0]]?.type || 'rocket';
+                  const dLabel = rd.c.splitNote
+                    ? `D${ri+1}${rd.c.splitGroup||''}`
+                    : `D${ri+1}`;
+                  animateDriver(rd.route, rd.c.wh.color, dLabel, ()=>{
                     done++;
                     if(done===routeData.length){
                       try{
@@ -914,11 +917,11 @@ function runAI(){
                       setPhaseBanner(`✓ AI complete — ${totalDist.toFixed(1)} km · ~${Math.round(totalMins)} min · ${finalClusters.length} drivers`);
                       document.getElementById('btn-run').disabled=false; simRunning=false;
                     }
-                  }, delivered, rd.orders, mtype, `driver-${ri}`);
+                  }, delivered, clusterOrders, mtype, `driver-${ri}`);
                 });
-              }, 600);
-            }, 700);
-          }, 800);
+              }, 300);
+            }, 400);
+          }, 500);
 
           // Safe renders (after scheduling above)
           try{ updateMetrics({mode:'ai',drivers:finalClusters.length,dist:totalDist,mins:totalMins,bldg:totalBldg,del:ORDERS.length}); }catch(e){}
@@ -926,11 +929,11 @@ function runAI(){
           try{ updateFinance('ai',finalClusters); }catch(e){}
           try{ showTab('metrics'); }catch(e){}
 
-        }, 1000); // end VRP setTimeout
+        }, 700); // end VRP setTimeout
 
-      }, 1000); // end split-check setTimeout
+      }, 600); // end split-check setTimeout
 
-    }, 1600); // end cluster setTimeout
+    }, 900); // end cluster setTimeout
 
   }, 900); // end assignment setTimeout
 }
